@@ -1,0 +1,36 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brutal AI Chat</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>brutal AI Chat</h1>
+            <button id="newChatButton" class="action-btn">New Chat</button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="suggestion-area" id="suggestionArea" style="display: none;">
+            <div class="reply-types">
+                <button class="reply-type-btn" data-type="flirty">Flirty 😘</button>
+                <button class="reply-type-btn" data-type="funny">Funny 😄</button>
+                <button class="reply-type-btn" data-type="tricky">Tricky 😏</button>
+                <button class="reply-type-btn" data-type="polite">Polite 😊</button>
+                <button class="reply-type-btn" data-type="spicy">Spicy 🌶️</button>
+            </div>
+            <div id="suggestions"></div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="messageInput" placeholder="Type their message...">
+            <button id="sendButton">Send</button>
+            <button id="suggestButton">Get Suggestions</button>
+        </div>
+        
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
