@@ -1,7 +1,8 @@
 // script.js
 // Initialize the Google AI Studio API client
-const API_KEY = 'AIzaSyBmrwuCfEkKQ6Fdcjt7KeLuvpKyBqWgiOQ'; // Replace with your actual API key
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+const API_KEY = 'AIzaSyA6xghsseVE26FK5ennFOWWEBhDhRjLOuo';
+const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const API_URL_VISION = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 let selectedReplyType = 'polite'; // Default reply type
 
@@ -18,6 +19,107 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendButton = document.getElementById('sendButton');
     const suggestButton = document.getElementById('suggestButton');
     const newChatButton = document.getElementById('newChatButton');
+    const startConversationButton = document.getElementById('startConversationButton'); // Add this line
+    const imageUploadButton = document.getElementById('imageUploadButton');
+    const imageInput = document.getElementById('imageInput');
+    
+    // Add image upload handlers
+    imageUploadButton.addEventListener('click', () => {
+        imageInput.click();
+    });
+
+    // Update the getImageReplySuggestions function
+    async function getImageReplySuggestions(imageData) {
+        const contextMessages = chatHistory.map(msg => `${msg.type === 'their' ? 'Them' : 'You'}: ${msg.text}`).join('\n');
+        
+        const contextPrompt = `You are RIZZ AI, a dating coach assistant. 
+        Someone has shared an image in the conversation.
+        
+        Previous conversation context:
+        ${contextMessages}
+        
+        Analyze the image in detail and generate 3 engaging responses that:
+        1. Reference specific details from the image
+        2. Keep the conversation flowing naturally
+        3. Show interest and personality
+        
+        Format responses as:
+        1.
+        2.
+        3.`;
+    
+        try {
+            const response = await fetch(`${API_URL_VISION}?key=${API_KEY}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: contextPrompt },
+                            {
+                                inline_data: {
+                                    mime_type: "image/jpeg",
+                                    data: imageData
+                                }
+                            }
+                        ]
+                    }]
+                })
+            });
+    
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+    
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+    
+        } catch (error) {
+            console.error('Error calling Gemini Vision API:', error);
+            throw error;
+        }
+    }
+    
+    // Update the image upload handler
+    imageInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please upload an image file');
+                return;
+            }
+            try {
+                showLoading();
+                const imageData = await convertImageToBase64(file);
+                // Display the image in chat first
+                const imageUrl = URL.createObjectURL(file);
+                addMessage('their', `<img src="${imageUrl}" alt="Shared image" style="max-width: 300px; border-radius: 8px; margin: 10px 0;">`);
+                
+                // Then get and display suggestions
+                const suggestions = await getImageReplySuggestions(imageData);
+                displaySuggestions(suggestions);
+            } catch (error) {
+                console.error('Error processing image:', error);
+                displaySuggestions('Sorry, there was an error analyzing the image. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+    });
+    
+    // Add this new event listener
+    startConversationButton.addEventListener('click', async () => {
+        try {
+            showLoading();
+            const suggestions = await getConversationStarters();
+            displaySuggestions(suggestions);
+        } catch (error) {
+            console.error('Error getting conversation starters:', error);
+            displaySuggestions('Sorry, there was an error generating suggestions. Please try again.');
+        }
+    });
     
     // New chat button handler
     newChatButton.addEventListener('click', () => {
@@ -83,12 +185,14 @@ function addMessage(type, text) {
     displayMessage(message);
 }
 
+// Update displayMessage function to handle HTML content
 function displayMessage(message) {
     const chatMessages = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `message message-${message.type}`;
+    // Use innerHTML to properly render images
     messageDiv.innerHTML = `
-        ${message.text}
+        <div class="message-content">${message.text}</div>
         <div class="timestamp">${message.timestamp}</div>
         ${message.type === 'their' ? `
             <div class="action-buttons" id="actions-${message.id}">
@@ -156,9 +260,8 @@ function saveToLocalStorage() {
 }
 
 async function getReplySuggestion(input, replyType) {
-    console.log('Generating suggestion for type:', replyType); // Debug log
+    console.log('Generating suggestion for type:', replyType);
 
-    // Create a context string from the entire chat history
     const contextMessages = chatHistory.map(msg => `${msg.type === 'their' ? 'Them' : 'You'}: ${msg.text}`).join('\n');
     
     const replyStyles = {
@@ -168,22 +271,29 @@ async function getReplySuggestion(input, replyType) {
         polite: "Generate a respectful response that is warm, friendly, and easy to read.",
         spicy: "Create a bold response that is daring and a bit provocative, but still uses simple language."
     };
-
+    
     const contextPrompt = `You are RIZZ AI, a dating coach assistant. 
     Here is the conversation history:
     ${contextMessages}
     
-    Based on this conversation, ${replyStyles[replyType]}
+    Analyze the conversation flow and ${replyStyles[replyType]}
+    Consider:
+    - The conversation's current topic and mood
+    - Previous messages' context
+    - Natural conversation progression
     
-    Generate 3 different response options in this style:
+    Generate 3 different contextually appropriate response options that:
+    1. Continue the current conversation naturally
+    2. Add value or move the conversation forward
+    3. Maintain engagement while staying true to the ${replyType} style
+    
+    Format responses as:
     1.
     2.
-    3.
+    3.`;
     
-    Make sure each response is unique and matches the requested ${replyType} tone.`;
-
     console.log('Context Prompt:', contextPrompt); // Debug log
-
+    
     try {
         const response = await fetch(`${API_URL}?key=${API_KEY}`, {
             method: 'POST',
@@ -204,17 +314,17 @@ async function getReplySuggestion(input, replyType) {
                 }
             })
         });
-
+    
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('API Error:', errorText); // Log the error response
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.text();
+            console.error('API Error Response:', errorData);
+            throw new Error(`API Error: ${response.status} - ${errorData}`);
         }
-
+    
         const data = await response.json();
         console.log('API Response:', data); // Log the successful response
         return data.candidates[0].content.parts[0].text;
-
+    
     } catch (error) {
         console.error('Error calling Gemini API:', error);
         throw error;
@@ -262,7 +372,7 @@ async function getAIResponse(input) {
     User message: ${input}
     
     Provide a helpful, friendly, and specific response while maintaining a supportive tone.`;
-
+    
     const requestBody = {
         contents: [{
             parts: [{
@@ -290,7 +400,7 @@ async function getAIResponse(input) {
             }
         ]
     };
-
+    
     try {
         const response = await fetch(`${API_URL}?key=${API_KEY}`, {
             method: 'POST',
@@ -299,16 +409,78 @@ async function getAIResponse(input) {
             },
             body: JSON.stringify(requestBody)
         });
-
+    
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-
+    
         const data = await response.json();
         return data.candidates[0].content.parts[0].text;
-
+    
     } catch (error) {
         console.error('Error calling Gemini API:', error);
         throw error;
     }
+}
+
+// Add this new function
+async function getConversationStarters() {
+    const contextPrompt = `You are RIZZ AI, a dating coach assistant. 
+    ${chatHistory.length === 0 ? 'This is a new conversation.' : 'Here is the conversation history:\n' + 
+    chatHistory.map(msg => `${msg.type === 'their' ? 'Them' : 'You'}: ${msg.text}`).join('\n')}
+    
+    Generate 3 engaging conversation starters that:
+    1. Are natural and contextually appropriate
+    2. Encourage meaningful responses
+    3. Show genuine interest and personality
+    
+    Format responses as:
+    1.
+    2.
+    3.`;
+    
+    try {
+        const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: contextPrompt
+                    }]
+                }],
+                generationConfig: {
+                    temperature: 0.8,
+                    topK: 40,
+                    topP: 0.95,
+                    maxOutputTokens: 1024,
+                }
+            })
+        });
+    
+        if (!response.ok) {
+            const errorData = await response.text();
+            console.error('API Error Response:', errorData);
+            throw new Error(`API Error: ${response.status} - ${errorData}`);
+        }
+    
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+    
+    } catch (error) {
+        console.error('Error calling Gemini API:', error);
+        throw error;
+    }
+}
+
+// Add these new functions
+async function convertImageToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 }
